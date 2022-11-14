@@ -8,11 +8,15 @@ use ReflectionClass;
 use Illuminate\Support\Str;
 use Exception;
 use Throwable;
+use MCH\Macher\Facades\Macher;
 
 class LaravelRequestDocs
 {
-    public function getDocs(): array
+    public $laravelVoyagerBreadDoc = 1;
+    public $macher;
+    public function getDocs()
     {
+        $this->macher = new Macher;
         $docs = [];
         $excludePatterns = config('request-docs.hide_matching') ?? [];
         $controllersInfo = $this->getControllersInfo();
@@ -120,6 +124,48 @@ class LaravelRequestDocs
         foreach ($controllersInfo as $index => $controllerInfo) {
             $controller       = $controllerInfo['controller_full_path'];
             $method           = $controllerInfo['method'];
+
+            $controllersInfo[$index]['rules'] = [];
+
+            if(!empty($this->laravelVoyagerBreadDoc)){
+                $controllerPath = "App\Http\Controllers\\".$controllerInfo["controller"];
+                $dataType = $this->macher::model('DataType')->where('controller', '=', $controllerPath)->first();
+                if(!empty($dataType)){
+                    // CHECK STORE
+                   if($controllerInfo["method"] == "store"){
+
+                        $rows = $dataType->addRows;
+                        $rulespath = [];
+
+                        foreach($rows as $row){
+                            if(empty($row["add"])){
+                                continue;
+                            }
+
+                            $rowsType = "string";
+                            if($row["type"] == "number"){
+                                $rowsType = "integer";
+                            }
+                            $rulespath[$row["field"]] = [
+                                $rowsType, "required"
+                            ];
+                        }
+                        
+                        $customRules = $rulespath;
+
+                        $controllersInfo[$index]['rules'] = array_merge(
+                            $controllersInfo[$index]['rules'] ?? [],
+                            $customRules,
+                        );
+
+                        $controllersInfo[$index]['docBlock'] = $dataType->name;
+                   }
+                   continue;
+                }
+
+
+            }
+
             try {
                 $reflectionMethod = new ReflectionMethod($controller, $method);
             } catch (Throwable $e) {
@@ -188,6 +234,16 @@ class LaravelRequestDocs
             }
         }
         return $lrdComment;
+    }
+
+    // get text between first and last tag
+    private function getTextBetweenTags($docComment, $tag1, $tag2)
+    {
+        $docComment = trim($docComment);
+        $start = strpos($docComment, $tag1);
+        $end = strpos($docComment, $tag2);
+        $text = substr($docComment, $start + strlen($tag1), $end - $start - strlen($tag1));
+        return $text;
     }
 
     public function flattenRules($mixedRules)
@@ -260,7 +316,6 @@ class LaravelRequestDocs
                 }
             }
         }
-
         return $params;
     }
 }
