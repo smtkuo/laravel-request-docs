@@ -127,30 +127,30 @@ class LaravelRequestDocs
 
             $controllersInfo[$index]['rules'] = [];
 
-            if(!empty($this->laravelVoyagerBreadDoc)){
-                $controllerPath = "App\Http\Controllers\\".$controllerInfo["controller"];
+            if (!empty($this->laravelVoyagerBreadDoc)) {
+                $controllerPath = "App\Http\Controllers\\" . $controllerInfo["controller"];
                 $dataType = $this->macher::model('DataType')->where('controller', '=', $controllerPath)->first();
-                if(!empty($dataType)){
+                if (!empty($dataType)) {
                     // CHECK STORE
-                   if($controllerInfo["method"] == "store"){
-
+                    if ($controllerInfo["method"] == "store") {
                         $rows = $dataType->addRows;
                         $rulespath = [];
 
-                        foreach($rows as $row){
-                            if(empty($row["add"])){
+                        foreach ($rows as $row) {
+                            if (empty($row["add"])) {
                                 continue;
                             }
 
                             $rowsType = "string";
-                            if($row["type"] == "number"){
+                            if ($row["type"] == "number") {
                                 $rowsType = "integer";
                             }
                             $rulespath[$row["field"]] = [
-                                $rowsType, "required"
+                                $rowsType,
+                                ((!empty($row["required"])) ? "required" : "nullable")
                             ];
                         }
-                        
+
                         $customRules = $rulespath;
 
                         $controllersInfo[$index]['rules'] = array_merge(
@@ -159,11 +159,43 @@ class LaravelRequestDocs
                         );
 
                         $controllersInfo[$index]['docBlock'] = $dataType->name;
-                   }
-                   continue;
+                        continue;
+                    }
+                    if ($controllerInfo["method"] == "update") {
+                        $rows = $dataType->addRows;
+                        $rulespath = [];
+
+                        foreach ($rows as $row) {
+                            if (empty($row["edit"])) {
+                                continue;
+                            }
+
+                            $rowsType = "string";
+                            if ($row["type"] == "number") {
+                                $rowsType = "integer";
+                            }
+
+                            $rulespath[$row["field"]] = [
+                                $rowsType,
+                                ((!empty($row["required"])) ? "required" : "nullable")
+                            ];
+                        }
+
+                        $customRules = $rulespath;
+
+                        $controllersInfo[$index]['rules'] = array_merge(
+                            $controllersInfo[$index]['rules'] ?? [],
+                            $customRules,
+                        );
+
+                        $controllersInfo[$index]['docBlock'] = $dataType->name;
+                        continue;
+                    }
+                    if ($controllerInfo["method"] == "destroy") {
+                        $controllersInfo[$index]['docBlock'] = $dataType->name;
+                        continue;
+                    }
                 }
-
-
             }
 
             try {
@@ -312,7 +344,7 @@ class LaravelRequestDocs
                 $comment = explode(' ', $comment);
 
                 if (count($comment) > 0) {
-                    $params[$comment[0]] = array_values(array_filter($comment, fn($item) => $item != $comment[0]));
+                    $params[$comment[0]] = array_values(array_filter($comment, fn ($item) => $item != $comment[0]));
                 }
             }
         }
